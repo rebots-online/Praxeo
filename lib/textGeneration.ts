@@ -18,32 +18,35 @@ import {
 // Fix: Use process.env.API_KEY directly as per guidelines.
 const GEMINI_API_KEY = process.env.API_KEY;
 
-interface GenerateTextOptions {
+export interface GenerateTextProps { // Renamed from GenerateTextOptions
   modelName: string;
   prompt: string;
-  videoUrl?: string;
+  inputText?: string; // For text, topic, filename, weblink URL
+  videoUrl?: string; // Kept for specific YouTube processing by the model
+  // file?: File; // Placeholder for future direct file handling by the model
   temperature?: number;
   safetySettings?: SafetySetting[];
-  responseMimeType?: string; // Added for specifying response MIME type
+  responseMimeType?: string;
 }
 
 /**
- * Generate text content using the Gemini API, optionally including video data.
+ * Generate text content using the Gemini API.
  *
- * @param options - Configuration options for the generation request.
+ * @param props - Configuration properties for the generation request.
  * @returns The response from the Gemini API.
  */
 export async function generateText(
-  options: GenerateTextOptions,
+  props: GenerateTextProps,
 ): Promise<string> {
   const {
     modelName,
     prompt,
+    inputText,
     videoUrl,
     temperature = 0.75,
-    safetySettings, // Use provided safetySettings
-    responseMimeType, // Use provided responseMimeType
-  } = options;
+    safetySettings,
+    responseMimeType,
+  } = props;
 
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key is missing or empty');
@@ -51,21 +54,33 @@ export async function generateText(
 
   const ai = new GoogleGenAI({apiKey: GEMINI_API_KEY});
 
+  // Initialize parts with the main prompt text.
+  // If inputText is provided, it's assumed to be part of the prompt or the primary text content.
+  // The specific prompts (SPEC_FROM_TEXT_PROMPT, etc.) should correctly incorporate this.
   const parts: Part[] = [{text: prompt}];
 
+  // If videoUrl is provided (specifically for YouTube videos or direct video links),
+  // add it as fileData. For other input types like text, weblink, topic, filename,
+  // their content is expected to be embedded within the `prompt` itself (using `inputText`).
   if (videoUrl) {
     try {
       parts.push({
         fileData: {
-          mimeType: 'video/mp4',
+          mimeType: 'video/mp4', // Assuming video/mp4 for URLs, might need adjustment for other file types if directly supported
           fileUri: videoUrl,
         },
       });
     } catch (error) {
       console.error('Error processing video input:', error);
+      // It's crucial to decide if this should be a fatal error.
+      // If a video URL is provided but fails, it might be better to throw.
       throw new Error(`Failed to process video input from URL: ${videoUrl}`);
     }
   }
+  // Note: Direct file objects (props.file) are not handled here yet.
+  // That would require a different mechanism, possibly involving multipart requests
+  // or uploading the file and then passing a URI, depending on the model's capabilities.
+  // For now, file-based input relies on the filename being incorporated into the prompt (via inputText).
 
   const generationConfig: GenerateContentConfig = {
     temperature,
