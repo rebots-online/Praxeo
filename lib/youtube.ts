@@ -73,23 +73,3 @@ export function getYoutubeEmbedUrl(url: string): string {
   );
   return url;
 }
-
-export async function getYouTubeVideoTitle(url: string) {
-  const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-
-  const response = await fetch(oEmbedUrl);
-
-  if (!response.ok) {
-    throw new Error('Not valid Url');
-  }
-
-  // Parse the JSON response
-  const data = await response.json();
-
-  // Display the title
-  if (data && data.title) {
-    return data.title;
-  } else {
-    throw new Error('Error: No title found in the response.');
-  }
-}

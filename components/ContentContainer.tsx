@@ -17,15 +17,25 @@ import {Tab, TabList, TabPanel, Tabs} from 'react-tabs';
 
 import {parseHTML, parseJSON} from '@/lib/parse';
 import {
-  // Fix: CODE_REGION_CLOSER and CODE_REGION_OPENER are not needed for the new parseHTML
   SPEC_ADDENDUM,
+  SPEC_FROM_FILENAME_PROMPT,
+  SPEC_FROM_PDF_CONTENT_PROMPT, // Added for PDF
+  SPEC_FROM_TEXT_PROMPT,
+  SPEC_FROM_TOPIC_PROMPT,
   SPEC_FROM_VIDEO_PROMPT,
+  SPEC_FROM_WEBCONTENT_PROMPT, // Added for web content
+  SPEC_FROM_WEBLINK_PROMPT,
 } from '@/lib/prompts';
-import {generateText} from '@/lib/textGeneration';
-import { HarmCategory, HarmBlockThreshold, SafetySetting } from '@google/genai';
+import {generateText, GenerateTextProps} from '@/lib/textGeneration';
+import {InputContentType} from '@/lib/types';
+import {HarmCategory, HarmBlockThreshold, SafetySetting} from '@google/genai';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Setup PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ContentContainerProps {
-  contentBasis: string;
+  contentBasis: InputContentType | string; // Allow string for backward compatibility with examples
   preSeededSpec?: string;
   preSeededCode?: string;
   onLoadingStateChange?: (isLoading: boolean) => void;
@@ -66,12 +76,19 @@ export default forwardRef(function ContentContainer(
 ) {
   const [spec, setSpec] = useState<string>(preSeededSpec || '');
   const [code, setCode] = useState<string>(preSeededCode || '');
+  // Determine initial loading state based on whether contentBasis is a string (old example) or InputContentType
+  const initialLoadingState = () => {
+    if (preSeededSpec && preSeededCode) return 'ready';
+    if (typeof contentBasis === 'string' && contentBasis) return 'loading-spec'; // Legacy example string
+    if (typeof contentBasis === 'object' && contentBasis.type) return 'loading-spec'; // New input type
+    return 'ready'; // Default if no contentBasis
+  };
+
   const [iframeKey, setIframeKey] = useState(0);
   const [saveMessage, setSaveMessage] = useState('');
-  const [loadingState, setLoadingState] = useState<LoadingState>(
-    preSeededSpec && preSeededCode ? 'ready' : 'loading-spec',
-  );
+  const [loadingState, setLoadingState] = useState<LoadingState>(initialLoadingState());
   const [error, setError] = useState<string | null>(null);
+  const [currentContentBasis, setCurrentContentBasis] = useState<InputContentType | null>(null);
   const [isEditingSpec, setIsEditingSpec] = useState(false);
   const [editedSpec, setEditedSpec] = useState('');
   const [activeTabIndex, setActiveTabIndex] = useState(0); // 0: Spec, 1: Code, 2: Render
@@ -82,41 +99,171 @@ export default forwardRef(function ContentContainer(
     getCode: () => code,
   }));
 
-  // Helper function to generate content spec from video
-  const generateSpecFromVideo = async (videoUrl: string): Promise<string> => {
-    // Fix: Update model name and add responseMimeType for JSON
-    const specResponseText = await generateText({
-      modelName: 'gemini-2.5-flash-preview-04-17',
-      prompt: SPEC_FROM_VIDEO_PROMPT,
-      videoUrl: videoUrl,
-      responseMimeType: "application/json",
-      safetySettings: defaultSafetySettings, // Pass safety settings
-    });
+  // Helper function to extract text from a PDF file
+  const getTextFromPdfFile = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+    }
+    return fullText;
+  };
 
-    // Fix: Use updated parseJSON to handle potential markdown fences
+  // Helper function to attempt to fetch and extract text from a website
+  const getTextFromWebsite = async (url: string): Promise<string | null> => {
+    try {
+      // setLoadingState('loading-spec'); // Indicate fetching
+      // setError("Attempting to fetch website content..."); // Temporary status
+      const response = await fetch(url, { mode: 'cors' }); // CORS limitation applies
+      if (!response.ok) {
+        //setError(`Failed to fetch website: ${response.status} ${response.statusText}. Using URL for spec.`);
+        console.warn(`Failed to fetch website: ${response.status} ${response.statusText}`);
+        return null;
+      }
+      const htmlString = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlString, 'text/html');
+      // Basic text extraction
+      let extractedText = doc.body.innerText || "";
+      // Remove excessive newlines and whitespace
+      extractedText = extractedText.replace(/\s\s+/g, ' ').trim();
+      //setError(null); // Clear temporary status
+      return extractedText;
+    } catch (error) {
+      console.error('Error fetching or parsing website content:', error);
+      //setError(`Error fetching website content: ${error instanceof Error ? error.message : String(error)}. Using URL for spec.`);
+      return null;
+    }
+  };
+
+
+  // Helper function to generate content spec from various input types
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+    }
+    return fullText;
+  };
+
+
+  // Helper function to generate content spec from various input types
+  const generateSpecFromInput = async (
+    input: InputContentType,
+  ): Promise<string> => {
+    let prompt = '';
+    const genTextProps: GenerateTextProps = {
+      modelName: 'gemini-1.5-flash-latest',
+      responseMimeType: 'application/json',
+      safetySettings: defaultSafetySettings,
+    };
+    let specNeedsAddendum = true; // Most prompts need it, PDF prompt includes it.
+
+    switch (input.type) {
+      case 'youtube':
+        prompt = SPEC_FROM_VIDEO_PROMPT;
+        genTextProps.videoUrl = input.url;
+        break;
+      case 'text':
+        prompt = SPEC_FROM_TEXT_PROMPT.replace('{text}', input.description);
+        genTextProps.inputText = input.description;
+        break;
+      case 'file':
+        if (input.file.type === 'application/pdf') {
+          setLoadingState('loading-spec'); // Or a more specific "processing-file"
+          try {
+            const pdfText = await getTextFromPdfFile(input.file);
+            // Check if pdfText is empty or too short, fallback to filename
+            if (!pdfText.trim() || pdfText.trim().length < 50) { // Arbitrary threshold
+                console.warn("Extracted PDF text is very short or empty, falling back to filename.");
+                prompt = SPEC_FROM_FILENAME_PROMPT.replace('{filename}', input.name);
+                genTextProps.inputText = input.name;
+            } else {
+                prompt = SPEC_FROM_PDF_CONTENT_PROMPT.replace('{pdfText}', pdfText);
+                genTextProps.inputText = pdfText; // Send extracted PDF text
+                specNeedsAddendum = false; // SPEC_FROM_PDF_CONTENT_PROMPT already includes addendum
+            }
+          } catch (pdfError) {
+            console.error('Error parsing PDF, falling back to filename:', pdfError);
+            setError('Error processing PDF. Using filename for spec generation.');
+            // Fallback to using filename if PDF parsing fails
+            prompt = SPEC_FROM_FILENAME_PROMPT.replace('{filename}', input.name);
+            genTextProps.inputText = input.name;
+          }
+        } else {
+          // For other file types, use filename
+          prompt = SPEC_FROM_FILENAME_PROMPT.replace('{filename}', input.name);
+          genTextProps.inputText = input.name;
+        }
+        break;
+      case 'weblink':
+        // eslint-disable-next-line no-case-declarations
+        const websiteUrl = input.url;
+        //setError(null); // Clear previous errors before attempting fetch
+        setLoadingState('loading-spec'); // Indicate general spec loading
+        // Set a more specific message if desired, but global loadingState handles the spinner
+        console.log("Attempting to fetch website content..."); // For console feedback
+
+        // eslint-disable-next-line no-case-declarations
+        const fetchedText = await getTextFromWebsite(websiteUrl);
+
+        if (fetchedText && fetchedText.trim().length > 100) { // Arbitrary length check
+          console.log("Successfully fetched website content.");
+          prompt = SPEC_FROM_WEBCONTENT_PROMPT
+            .replace('{webText}', fetchedText)
+            .replace('{sourceUrl}', websiteUrl);
+          genTextProps.inputText = fetchedText;
+          specNeedsAddendum = false; // Webcontent prompt includes addendum
+          setError(null); // Clear any previous non-blocking error from fetching
+        } else {
+          if (fetchedText) { // Content was fetched but too short
+            console.warn("Fetched website content was too short. Falling back to URL.");
+            setError("Fetched website content was too short. Using URL for spec generation.");
+          } else { // Fetching failed
+            console.warn("Failed to fetch website content directly. Falling back to URL.");
+            setError("Could not fetch website content directly due to browser restrictions (e.g., CORS). Using URL for spec generation.");
+          }
+          prompt = SPEC_FROM_WEBLINK_PROMPT.replace('{url}', websiteUrl);
+          genTextProps.inputText = websiteUrl;
+          specNeedsAddendum = true; // WEBLINK_PROMPT needs addendum
+        }
+        break;
+      case 'topic':
+        prompt = SPEC_FROM_TOPIC_PROMPT.replace('{topic}', input.topic);
+        genTextProps.inputText = input.topic;
+        break;
+      default:
+        throw new Error('Unsupported input type for spec generation');
+    }
+    genTextProps.prompt = prompt;
+
+    const specResponseText = await generateText(genTextProps);
     const parsedData = parseJSON(specResponseText);
     let generatedSpec = parsedData.spec;
 
     if (typeof generatedSpec !== 'string') {
-      console.error("Parsed spec is not a string:", parsedData);
+      console.error('Parsed spec is not a string:', parsedData);
       throw new Error("The 'spec' field in the JSON response was not a string.");
     }
-    
-    generatedSpec += SPEC_ADDENDUM;
 
+    if (specNeedsAddendum) {
+      generatedSpec += SPEC_ADDENDUM;
+    }
     return generatedSpec;
   };
 
   // Helper function to generate code from content spec
-  const generateCodeFromSpec = async (spec: string): Promise<string> => {
-    // Fix: Update model name
+  const generateCodeFromSpec = async (specToUse: string): Promise<string> => {
     const codeResponseText = await generateText({
-      modelName: 'gemini-2.5-flash-preview-04-17',
-      prompt: spec,
-      safetySettings: defaultSafetySettings, // Pass safety settings
+      modelName: 'gemini-1.5-flash-latest', // Updated model name
+      prompt: specToUse,
+      safetySettings: defaultSafetySettings,
     });
-
-    // Fix: Use updated parseHTML (no longer needs opener/closer arguments)
     const generatedCode = parseHTML(codeResponseText);
     return generatedCode;
   };
@@ -130,57 +277,86 @@ export default forwardRef(function ContentContainer(
     }
   }, [loadingState, onLoadingStateChange]);
 
-  // On mount (or when contentBasis changes), generate a content spec and then use that spec to generate code
+  // Effect to normalize contentBasis and trigger content generation
+  useEffect(() => {
+    let inputToProcess: InputContentType | null = null;
+
+    if (typeof contentBasis === 'string') {
+      // Handle legacy string contentBasis (assumed to be YouTube URL for examples)
+      if (contentBasis) { // Ensure it's not an empty string
+        inputToProcess = {type: 'youtube', url: contentBasis};
+      }
+    } else if (contentBasis && typeof contentBasis === 'object' && contentBasis.type) {
+      // Handle new InputContentType object
+      inputToProcess = contentBasis;
+    }
+    setCurrentContentBasis(inputToProcess); // Store the processed basis
+  }, [contentBasis]);
+
+
+  // Main effect for generating spec and code when currentContentBasis changes
   useEffect(() => {
     async function generateContent() {
-      // If we have pre-seeded content, skip generation
+      if (!currentContentBasis) {
+         // If there's no valid content basis after processing, set to ready or error.
+         // This can happen if contentBasis was an empty string or undefined.
+        if (!preSeededSpec && !preSeededCode) { // Avoid resetting if pre-seeded
+          setLoadingState('ready'); // Or 'error' with a specific message
+          setError("No valid input provided to generate content.");
+          setActiveTabIndex(0); // Go to spec tab to show error or empty state
+        }
+        return;
+      }
+      // If we have pre-seeded content, skip generation for this specific basis
       if (preSeededSpec && preSeededCode) {
         setSpec(preSeededSpec);
         setCode(preSeededCode);
         setLoadingState('ready');
-        setActiveTabIndex(2); // If pre-seeded, jump to render tab
+        setActiveTabIndex(2); // Jump to render tab
         return;
       }
 
       try {
-        // Reset states
         setLoadingState('loading-spec');
-        setActiveTabIndex(0); // Start on Spec tab
+        setActiveTabIndex(0);
         setError(null);
         setSpec('');
         setCode('');
 
-        // Generate a content spec based on video content
-        const generatedSpec = await generateSpecFromVideo(contentBasis);
+        const generatedSpec = await generateSpecFromInput(currentContentBasis);
         setSpec(generatedSpec);
         setLoadingState('loading-code');
-        setActiveTabIndex(1); // Switch to Code tab after spec generation
+        setActiveTabIndex(1);
 
-        // Generate code using the generated content spec
         const generatedCode = await generateCodeFromSpec(generatedSpec);
         setCode(generatedCode);
         setLoadingState('ready');
-        setActiveTabIndex(2); // Switch to Render tab after code generation
+        setActiveTabIndex(2);
       } catch (err) {
-        console.error(
-          'An error occurred while attempting to generate content:',
-          err,
-        );
-        setError(
-          err instanceof Error ? err.message : 'An unknown error occurred',
-        );
+        console.error('Error generating content:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setLoadingState('error');
-        // Stay on current tab or switch to Spec tab if error occurred during spec generation
-        if (loadingState === 'loading-spec') {
-            setActiveTabIndex(0);
-        } else if (loadingState === 'loading-code') {
-            setActiveTabIndex(1);
+        // Determine active tab based on when the error occurred
+        if (loadingState === 'loading-spec' || !spec) {
+          setActiveTabIndex(0); // Error during spec generation or spec is empty
+        } else {
+          setActiveTabIndex(1); // Error during code generation
         }
       }
     }
+    // Only run if not pre-seeded or if the currentContentBasis has changed
+    // and is not null.
+    if (currentContentBasis && !(preSeededSpec && preSeededCode)) {
+       generateContent();
+    } else if (preSeededSpec && preSeededCode) {
+      // This handles the initial load with pre-seeded content correctly.
+      setSpec(preSeededSpec);
+      setCode(preSeededCode);
+      setLoadingState('ready');
+      setActiveTabIndex(2);
+    }
+  }, [currentContentBasis, preSeededSpec, preSeededCode]); // Removed spec from dependencies to avoid re-triggering on spec edit
 
-    generateContent();
-  }, [contentBasis, preSeededSpec, preSeededCode]);
 
   // Re-render iframe when code changes
   useEffect(() => {
@@ -268,7 +444,10 @@ export default forwardRef(function ContentContainer(
           marginTop: '20px',
         }}>
         {loadingState === 'loading-spec'
-          ? 'Generating content spec from video...'
+          ? `Generating content spec from ${currentContentBasis?.type || 'input'}...${
+              currentContentBasis?.type === 'file' && currentContentBasis.file.type === 'application/pdf' ? ' (processing PDF)' :
+              currentContentBasis?.type === 'weblink' ? ' (fetching website)' : ''
+            }`
           : 'Generating code from content spec...'}
       </p>
     </div>
@@ -295,12 +474,7 @@ export default forwardRef(function ContentContainer(
       </div>
       <h3 style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>Error</h3>
       <p>{error || 'Something went wrong'}</p>
-      {!contentBasis.startsWith('http://') &&
-      !contentBasis.startsWith('https://') ? (
-        <p style={{marginTop: '0.5rem'}}>
-          (<strong>NOTE:</strong> URL must begin with http:// or https://)
-        </p>
-      ) : null}
+      {/* Conditional error message for URL format removed as contentBasis is now an object */}
     </div>
   );
 
