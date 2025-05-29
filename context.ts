@@ -1,17 +1,36 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 /* tslint:disable */
 
+import React from 'react';
 import {Example} from '@/lib/types';
-import {type Dispatch, type SetStateAction, createContext} from 'react';
+import {UserInfo} from '@/lib/authService'; // Import UserInfo
 
-export interface Data {
+export interface AppContextType {
   examples: Example[];
-  setExamples: Dispatch<SetStateAction<Example[]>>;
-  defaultExample: Example;
-  isLoading: boolean;
+  isLoading: boolean; // For example data loading
+  setExamples: (examples: Example[]) => void;
+  defaultExample: Example | null;
+
+  // New authentication state
+  userInfo: UserInfo | null;
+  authLoading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-export const DataContext = createContext<Data>(null);
+// Provide default values for the context
+export const DataContext = React.createContext<AppContextType>({
+  examples: [],
+  isLoading: true,
+  setExamples: () => {},
+  defaultExample: null,
+
+  // Default auth values
+  userInfo: null,
+  authLoading: false,
+  login: async () => {},
+  logout: async () => {},
+});

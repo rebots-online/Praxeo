@@ -229,6 +229,209 @@ input:focus::placeholder {
   }
 }
 
+.guidance-container {
+  margin-top: 1rem; /* Add some space above the guidance section */
+}
+
+.guidance-input {
+  width: 100%; /* Ensure it takes full width */
+  min-height: 60px; /* Adjust as needed */
+}
+
+.payment-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #007bff; /* Blue border */
+  border-radius: 8px;
+  background-color: #f8f9fa; /* Light background */
+}
+
+.payment-section h3 {
+  margin-top: 0;
+  color: #0056b3; /* Darker blue for heading */
+}
+
+.payment-section p {
+  margin-bottom: 0.5rem;
+}
+
+.payment-section strong {
+  color: #333;
+}
+
+.payment-section textarea {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  resize: vertical; /* Allow vertical resize */
+}
+
+.payment-section .button-primary {
+  margin-top: 1rem;
+  background-color: #007bff;
+  color: white;
+  padding: 0.75rem 1.5rem; /* Larger button */
+  font-size: 1rem;
+}
+
+.payment-section .button-primary:hover {
+  background-color: #0056b3;
+}
+
+.input-type-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.input-type-selector label {
+  cursor: pointer;
+  padding: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.input-type-selector input[type="radio"] {
+  margin-right: 0.5rem;
+}
+
+.input-type-selector label:has(input[type="radio"]:checked) {
+  /* background-color: #e0e0e0; */
+  border-color: #ccc; 
+  font-weight: bold;
+}
+
+.input-section textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 1rem;
+  box-sizing: border-box; /* Add box-sizing */
+}
+
+.input-section input[type="file"] {
+  width: 100%;
+  padding: 0.5rem;
+  box-sizing: border-box; /* Add box-sizing */
+}
+
+.file-name-display {
+  font-size: 0.85rem;
+  color: #555;
+  margin-top: 0.5rem;
+  word-break: break-all;
+}
+
+/* Adjustments for better layout if .input-section is flex */
+.input-container {
+  width: 100%; /* Ensure containers take full width */
+  margin-bottom: 0.5rem; /* Add some space below each input group */
+}
+
+/* Ensure the main input section can grow if needed */
+.input-section {
+    /* ... existing styles ... */
+    /* display: flex; */ /* If it's already flex, good */
+    /* flex-direction: column; */ /* If it's already column, good */
+    gap: 0.5rem; /* Adjust gap between input groups if needed */
+}
+
+/* styles.css or index.css */
+
+/* ... existing styles ... */
+
+.app-header {
+  /* ... existing styles ... */
+  /* Ensure header can accommodate new elements */
+  padding: 0.5rem 1rem; /* Adjust as needed */
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.title-section {
+  /* flex-grow: 1; /* Allow title to take available space */
+  /* Removed flex-grow to allow auth section to naturally fit */
+}
+
+.auth-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* Spacing between elements if user is logged in */
+}
+
+.button-auth {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.button-auth:hover {
+  background-color: #e0e0e0;
+}
+
+.button-auth.loading {
+  cursor: default;
+  background-color: #f0f0f0;
+  color: #777;
+}
+
+.login-button {
+  background-color: #ffc107; /* Alby-like yellow */
+  border-color: #ffc107;
+  color: #333;
+}
+
+.login-button:hover {
+  background-color: #e0a800;
+}
+
+.logout-button {
+  background-color: #f44336; /* Red for logout */
+  border-color: #f44336;
+  color: white;
+}
+
+.logout-button:hover {
+  background-color: #d32f2f;
+}
+
+.user-info-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* Spacing between greeting and logout button */
+}
+
+.user-greeting {
+  font-size: 0.9rem;
+  color: #333; /* Or match your theme */
+}
+
+.user-greeting .lightning-address {
+  font-size: 0.75rem;
+  color: #555;
+  margin-left: 4px;
+}
+
+/* Ensure subtitle doesn't push things around too much */
+.sub-title {
+   margin-top: 0.25rem; /* Adjust as needed */
+   margin-bottom: 0.25rem; /* Adjust as needed */
+}
+
 .left-side {
   width: 40%;
   height: 100%; /* Takes height of main-container */

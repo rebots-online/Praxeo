@@ -1,7 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 /* tslint:disable */
 
 export const SPEC_FROM_VIDEO_PROMPT = `You are a pedagogist and product designer with deep expertise in crafting engaging learning experiences via interactive web apps.
@@ -23,7 +23,32 @@ The goal of the app that is to be built based on the spec is to enhance understa
 
 Provide the result as a JSON object containing a single field called "spec", whose value is the spec for the web app.`;
 
+export const TEXT_TO_SPEC_PROMPT = `You are a pedagogist and product designer with deep expertise in crafting engaging learning experiences via interactive web apps.
+
+Read the following text content. Then, write a detailed and carefully considered spec for an interactive web app designed to help a user understand and engage with the key ideas presented in the text. The spec should be thorough and self-contained.
+
+The goal of the app that is to be built based on the spec is to enhance understanding through simple and playful design. The provided spec should not be overly complex, i.e., a junior web developer should be able to implement it in a single html file (with all styles and scripts inline). Most importantly, the spec must clearly outline the core mechanics of the app, and those mechanics must be highly effective in reinforcing the text's key idea(s).
+
+Provide the result as a JSON object containing a single field called "spec", whose value is the spec for the web app.`;
+
+export const AUDIO_TO_SPEC_PROMPT = `You are a pedagogist and product designer with deep expertise in crafting engaging learning experiences via interactive web apps.
+
+Based on the provided audio content (which might be a transcript or summary), write a detailed and carefully considered spec for an interactive web app designed to help a user understand and engage with the key ideas from the audio. The spec should be thorough and self-contained.
+
+The goal of the app that is to be built based on the spec is to enhance understanding through simple and playful design. The provided spec should not be overly complex, i.e., a junior web developer should be able to implement it in a single html file (with all styles and scripts inline). Most importantly, the spec must clearly outline the core mechanics of the app, and those mechanics must be highly effective in reinforcing the audio's key idea(s).
+
+Provide the result as a JSON object containing a single field called "spec", whose value is the spec for the web app.`;
+
+export const SPEC_TO_CODE_PROMPT = `You are an expert web developer. Based on the provided specification, generate the HTML, CSS, and JavaScript code for the web application. 
+The code should be directly renderable in a browser.
+The specification may include details about output format (e.g., single HTML file, inline styles/scripts). Adhere to those details.
+Focus on creating functional, clean, and understandable code that implements the features described in the spec.`;
+
 export const CODE_REGION_OPENER = '```';
 export const CODE_REGION_CLOSER = '```';
 
-export const SPEC_ADDENDUM = `\n\nThe app must be fully responsive and function properly on both desktop and mobile. Provide the code as a single, self-contained HTML document. All styles and scripts must be inline. In the result, encase the code between "${CODE_REGION_OPENER}" and "${CODE_REGION_CLOSER}" for easy parsing.`;
+export const SPEC_ADDENDUM = `
+
+The app must be fully responsive and function properly on both desktop and mobile. Provide the code as a single, self-contained HTML document. All styles and scripts must be inline. In the result, encase the code between "${CODE_REGION_OPENER}" and "${CODE_REGION_CLOSER}" for easy parsing.`;
+
+```
